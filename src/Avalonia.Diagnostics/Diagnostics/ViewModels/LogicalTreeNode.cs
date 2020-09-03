@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.LogicalTree;
@@ -11,12 +12,14 @@ namespace Avalonia.Diagnostics.ViewModels
             : base((Control)logical, parent)
         {
             Children = new LogicalTreeNodeCollection(this, logical);
+            
+            SubtreeSize = logical.GetLogicalDescendants().LongCount();
+            UpdateTooltip();
         }
 
         public static LogicalTreeNode[] Create(object control)
         {
-            var logical = control as ILogical;
-            return logical != null ? new[] { new LogicalTreeNode(logical, null) } : null;
+            return control is ILogical logical ? new[] { new LogicalTreeNode(logical, null) } : null;
         }
 
         internal class LogicalTreeNodeCollection : TreeNodeCollection
@@ -44,5 +47,6 @@ namespace Avalonia.Diagnostics.ViewModels
                     () => nodes.Clear());
             }
         }
+
     }
 }

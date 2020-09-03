@@ -11,7 +11,7 @@ namespace Avalonia.Diagnostics.ViewModels
     {
         private AvaloniaList<TreeNode> _inner;
 
-        public TreeNodeCollection(TreeNode owner) => Owner = owner;
+        protected TreeNodeCollection(TreeNode owner) => Owner = owner;
 
         public TreeNode this[int index]
         {

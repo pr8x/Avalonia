@@ -1,21 +1,23 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Text;
 using Avalonia.Controls;
 using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
 
 namespace Avalonia.Diagnostics.ViewModels
 {
-    internal class TreeNode : ViewModelBase, IDisposable
+    internal abstract class TreeNode : ViewModelBase, IDisposable
     {
         private IDisposable _classesSubscription;
         private string _classes;
         private bool _isExpanded;
+        private string _toolTip;
 
-        public TreeNode(IVisual visual, TreeNode parent)
+        protected TreeNode(IVisual visual, TreeNode parent)
         {
             Parent = parent;
             Type = visual.GetType().Name;
@@ -49,6 +51,29 @@ namespace Avalonia.Diagnostics.ViewModels
             }
         }
 
+        protected void UpdateTooltip()
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"{Type}");
+
+            if (Visual is Control control &&
+                !string.IsNullOrEmpty(control.Name))
+            {
+                sb.AppendLine($"Name: {control.Name}");
+            }
+
+            sb.Append($"Subtree Size: {SubtreeSize}");
+
+            ToolTip = sb.ToString();
+        }
+
+        protected long SubtreeSize
+        {
+            get; 
+            set;
+        }
+
         public TreeNodeCollection Children
         {
             get;
@@ -72,6 +97,12 @@ namespace Avalonia.Diagnostics.ViewModels
             set { RaiseAndSetIfChanged(ref _isExpanded, value); }
         }
 
+        public string ToolTip
+        {
+            get { return _toolTip; }
+            set { RaiseAndSetIfChanged(ref _toolTip, value); }
+        }
+
         public TreeNode Parent
         {
             get;
@@ -80,28 +111,12 @@ namespace Avalonia.Diagnostics.ViewModels
         public string Type
         {
             get;
-            private set;
         }
 
         public void Dispose()
         {
             _classesSubscription.Dispose();
             Children.Dispose();
-        }
-
-        private static int IndexOf(IReadOnlyList<TreeNode> collection, TreeNode item)
-        {
-            var count = collection.Count;
-
-            for (var i = 0; i < count; ++i)
-            {
-                if (collection[i] == item)
-                {
-                    return i;
-                }
-            }
-
-            throw new AvaloniaInternalException("TreeNode was not present in parent Children collection.");
         }
     }
 }

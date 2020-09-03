@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Text;
 using Avalonia.Collections;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
@@ -12,18 +14,20 @@ namespace Avalonia.Diagnostics.ViewModels
         {
             Children = new VisualTreeNodeCollection(this, visual);
 
-            if ((Visual is IStyleable styleable))
+            if (Visual is IStyleable styleable)
             {
                 IsInTemplate = styleable.TemplatedParent != null;
             }
+
+            SubtreeSize = visual.GetVisualDescendants().LongCount();
+            UpdateTooltip();
         }
 
-        public bool IsInTemplate { get; private set; }
+        public bool IsInTemplate { get; }
 
         public static VisualTreeNode[] Create(object control)
         {
-            var visual = control as IVisual;
-            return visual != null ? new[] { new VisualTreeNode(visual, null) } : null;
+            return control is IVisual visual ? new[] { new VisualTreeNode(visual, null) } : null;
         }
 
         internal class VisualTreeNodeCollection : TreeNodeCollection
@@ -50,5 +54,6 @@ namespace Avalonia.Diagnostics.ViewModels
                     () => nodes.Clear());
             }
         }
+
     }
 }
