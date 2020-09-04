@@ -3,6 +3,7 @@ using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Diagnostics.Models;
 using Avalonia.Input;
+using Avalonia.Platform;
 using Avalonia.Threading;
 
 namespace Avalonia.Diagnostics.ViewModels
@@ -13,6 +14,7 @@ namespace Avalonia.Diagnostics.ViewModels
         private readonly TreePageViewModel _logicalTree;
         private readonly TreePageViewModel _visualTree;
         private readonly EventsPageViewModel _events;
+        private readonly PerformanceViewModel _perf;
         private readonly IDisposable _pointerOverSubscription;
         private ViewModelBase _content;
         private int _selectedTab;
@@ -26,6 +28,7 @@ namespace Avalonia.Diagnostics.ViewModels
             _logicalTree = new TreePageViewModel(this, LogicalTreeNode.Create(root));
             _visualTree = new TreePageViewModel(this, VisualTreeNode.Create(root));
             _events = new EventsPageViewModel(root);
+            _perf = new PerformanceViewModel(AvaloniaLocator.Current.GetService<IGraphicsMemoryDiagnostics>());
 
             UpdateFocusedControl();
             KeyboardDevice.Instance.PropertyChanged += KeyboardPropertyChanged;
@@ -84,19 +87,14 @@ namespace Avalonia.Diagnostics.ViewModels
             set
             {
                 _selectedTab = value;
-
-                switch (value)
+                Content = value switch
                 {
-                    case 0:
-                        Content = _logicalTree;
-                        break;
-                    case 1:
-                        Content = _visualTree;
-                        break;
-                    case 2:
-                        Content = _events;
-                        break;
-                }
+                    0 => _logicalTree,
+                    1 => _visualTree,
+                    2 => _events,
+                    3 => _perf,
+                    _ => null,
+                };
 
                 RaisePropertyChanged();
             }
