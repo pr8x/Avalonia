@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Reactive.Disposables;
 using Avalonia.Logging;
 using Avalonia.VisualTree;
 
@@ -324,6 +326,24 @@ namespace Avalonia.Layout
         }
 
         /// <summary>
+        /// Gets the time it took to layout this element.
+        /// </summary>
+        public TimeSpan ExclusiveLayoutTime
+        {
+            get; 
+            private set;
+        }
+
+        /// <summary>
+        /// Gets the time it took to layout this element and its children.
+        /// </summary>
+        public TimeSpan InclusiveLayoutTime
+        {
+            get; 
+            private set;
+        }
+
+        /// <summary>
         /// Gets the available size passed in the previous layout pass, if any.
         /// </summary>
         Size? ILayoutable.PreviousMeasure => _previousMeasure;
@@ -556,6 +576,9 @@ namespace Avalonia.Layout
                 var constrained = LayoutHelper.ApplyLayoutConstraints(
                     this,
                     availableSize.Deflate(margin));
+
+                using var sw = Stopwatch(e => InclusiveLayoutTime = e);
+
                 var measured = MeasureOverride(constrained);
 
                 var width = measured.Width;
@@ -613,6 +636,8 @@ namespace Avalonia.Layout
             double width = 0;
             double height = 0;
 
+            using var sw = Stopwatch(e => ExclusiveLayoutTime = InclusiveLayoutTime - e);
+
             var visualChildren = VisualChildren;
             var visualCount = visualChildren.Count;
 
@@ -622,7 +647,9 @@ namespace Avalonia.Layout
 
                 if (visual is ILayoutable layoutable)
                 {
+
                     layoutable.Measure(availableSize);
+
                     width = Math.Max(width, layoutable.DesiredSize.Width);
                     height = Math.Max(height, layoutable.DesiredSize.Height);
                 }
@@ -844,6 +871,19 @@ namespace Avalonia.Layout
             }
 
             return result;
+        }
+
+        private static IDisposable Stopwatch(Action<TimeSpan> elapsedFn)
+        {
+            var sw = new Stopwatch();
+
+            sw.Start();
+
+            return Disposable.Create(() =>
+            {
+                sw.Stop();
+                elapsedFn(sw.Elapsed);
+            });
         }
     }
 }
