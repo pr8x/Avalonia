@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using Avalonia.Controls;
+using Avalonia.Diagnostics.ViewModels;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 
@@ -7,14 +9,19 @@ namespace Avalonia.Diagnostics.Controls
 {
     internal class FlameGraph : Control
     {
-        public static readonly DirectProperty<FlameGraph, object> RootProperty =
-            AvaloniaProperty.RegisterDirect<FlameGraph, object>(nameof(Root), o => o.Root, (o,v) => o.Root = v);
+        public static readonly DirectProperty<FlameGraph, TreeNode> RootProperty =
+            AvaloniaProperty.RegisterDirect<FlameGraph, TreeNode>(
+                nameof(Root),
+                o => o.Root,
+                (o, v) => o.Root = v);
 
-        public object Root
+        public TreeNode Root
         {
             get;
             set;
         }
+
+        public Func<TreeNode, TimeSpan> TimeExtractor { get; set; }
 
         private static Color ColorFromHSV(double hue, double saturation, double value)
         {
@@ -47,22 +54,102 @@ namespace Avalonia.Diagnostics.Controls
 
             const double maxHue = 55;
 
-            var k = index / 10;
+            var k = (index % 10) / 10.0;
 
             return ColorFromHSV(k * maxHue, 1, 1);
+        }
+
+        private TimeSpan GetNodeTime(TreeNode node)
+        {
+            return TimeExtractor(node);
+        }
+
+        private string GetNodeName(TreeNode node)
+        {
+            var name = node.Type;
+
+            if (node.Visual is Control control &&
+                !string.IsNullOrEmpty(control.Name))
+            {
+                name += $" '{control.Name}'";
+            }
+
+            name += $" {GetNodeTime(node).TotalMilliseconds}ms";
+
+            return name;
+        }
+
+        private readonly struct GraphNode
+        {
+            public GraphNode(TreeNode treeNode, int level)
+            {
+                TreeNode = treeNode;
+                Level = level;
+            }
+
+            public TreeNode TreeNode { get; }
+
+            public int Level { get; }
         }
 
         public override void Render(DrawingContext context)
         {
             base.Render(context);
 
-            const double barHeight = 10;
+            const double barHeight = 20;
 
-            var color = GetNodeColor(0);
-            var rect = new Rect(0, Bounds.Height - barHeight, Bounds.Width, barHeight);
-           
-            context.FillRectangle(new ImmutableSolidColorBrush(color), rect);
+            var baseline = GetNodeTime(Root.Children[0]);
 
+            var nodes = new Queue<GraphNode>();
+            var index = 0;
+            var levelOffsetX = 0.0;
+
+            nodes.Enqueue(new GraphNode(Root, 0));
+
+            while (nodes.Count > 0)
+            {
+                var current = nodes.Dequeue();
+
+                foreach (var child in current.TreeNode.Children)
+                {
+                    nodes.Enqueue(new GraphNode(child, current.Level + 1));
+                }
+
+                var nodeTime = GetNodeTime(current.TreeNode);
+
+                var nodeColor = GetNodeColor(index++);
+
+                var rect = new Rect(
+                    levelOffsetX,
+                    Bounds.Height - barHeight * current.Level,
+                    nodeTime.Ticks * Bounds.Width / baseline.Ticks,
+                    barHeight);
+
+                levelOffsetX += rect.Width;
+
+                context.FillRectangle(new ImmutableSolidColorBrush(nodeColor), rect);
+
+                var text = new FormattedText
+                {
+                    Text = GetNodeName(current.TreeNode), Typeface = Typeface.Default, FontSize = 10.0
+                };
+
+                using (context.PushClip(rect))
+                {
+                    context.DrawText(
+                        Brushes.White,
+                        new Point(0, rect.Center.Y - text.Bounds.Height / 2),
+                        text);
+                }
+
+                if (nodes.Count != 0 &&
+                    current.Level != nodes.Peek().Level)
+                {
+                    levelOffsetX = 0;
+                }
+            }
+
+            //Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Background);
         }
     }
 }

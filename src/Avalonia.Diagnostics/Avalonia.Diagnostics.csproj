@@ -30,4 +30,20 @@
   <Import Project="..\..\build\Rx.props" />
   <Import Project="..\..\build\BuildTargets.targets" />
   <Import Project="..\..\build\ApiDiff.props" />
+  <ItemGroup>
+    <AvaloniaResource Remove="Diagnostics\Views\PerformancePageView.xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Diagnostics\Views\PerformancePageView.xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <AvaloniaXaml Include="Diagnostics\Views\PerformancePageView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </AvaloniaXaml>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Diagnostics\Views\PerformancePageView.axaml.cs">
+      <DependentUpon>PerformancePageView.xaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
 </Project>

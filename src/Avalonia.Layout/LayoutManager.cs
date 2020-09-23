@@ -21,6 +21,7 @@ namespace Avalonia.Layout
         private readonly LayoutQueue<ILayoutable> _toArrange = new LayoutQueue<ILayoutable>(v => !v.IsArrangeValid);
         private readonly Action _executeLayoutPass;
         private List<EffectiveViewportChangedListener>? _effectiveViewportChangedListeners;
+        private Dictionary<ILayoutable, TimeSpan>? _layoutTimings;
         private bool _disposed;
         private bool _queued;
         private bool _running;
@@ -94,6 +95,22 @@ namespace Avalonia.Layout
             QueueLayoutPass();
         }
 
+        public void BeginProfileLayoutPass()
+        {
+            _layoutTimings = new Dictionary<ILayoutable, TimeSpan>();
+        }
+
+        public IReadOnlyDictionary<ILayoutable, TimeSpan> EndProfileLayoutPass()
+        {
+            Debug.Assert(_layoutTimings != null, $"Call {nameof(BeginProfileLayoutPass)} first!");
+
+            var copy = new Dictionary<ILayoutable, TimeSpan>(_layoutTimings);
+
+            _layoutTimings!.Clear();
+
+            return copy;
+        }
+
         /// <inheritdoc/>
         public virtual void ExecuteLayoutPass()
         {
@@ -152,7 +169,8 @@ namespace Avalonia.Layout
                 {
                     stopwatch!.Stop();
 
-                    Logger.TryGet(timingLogLevel, LogArea.Layout)?.Log(this, "Layout pass finished in {Time}", stopwatch.Elapsed);
+                    Logger.TryGet(timingLogLevel, LogArea.Layout)
+                        ?.Log(this, "Layout pass finished in {Time}", stopwatch.Elapsed);
                 }
             }
 
@@ -246,9 +264,26 @@ namespace Avalonia.Layout
             {
                 var control = _toMeasure.Dequeue();
 
+                var shouldProfile = _layoutTimings != null && !_layoutTimings.ContainsKey(control);
+
+                Stopwatch? sw = null;
+
+                if (shouldProfile)
+                {
+                    sw = new Stopwatch();
+
+                    sw.Start();
+                }
+
                 if (!control.IsMeasureValid && control.IsAttachedToVisualTree)
                 {
                     Measure(control);
+                }
+
+                if (shouldProfile)
+                {
+                    sw!.Stop();
+                    _layoutTimings!.Add(control, sw.Elapsed);
                 }
             }
         }
@@ -352,7 +387,8 @@ namespace Avalonia.Layout
                         if (viewport != l.Viewport)
                         {
                             l.Listener.EffectiveViewportChanged(new EffectiveViewportChangedEventArgs(viewport));
-                            _effectiveViewportChangedListeners[i] = new EffectiveViewportChangedListener(l.Listener, viewport);
+                            _effectiveViewportChangedListeners[i] =
+                                new EffectiveViewportChangedListener(l.Listener, viewport);
                         }
                     }
                 }

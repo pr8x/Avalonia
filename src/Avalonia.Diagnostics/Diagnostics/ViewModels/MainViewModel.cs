@@ -3,18 +3,12 @@ using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Diagnostics.Models;
 using Avalonia.Input;
-using Avalonia.Platform;
 using Avalonia.Threading;
 
 namespace Avalonia.Diagnostics.ViewModels
 {
     internal class MainViewModel : ViewModelBase, IDisposable
     {
-        private readonly IControl _root;
-        private readonly TreePageViewModel _logicalTree;
-        private readonly TreePageViewModel _visualTree;
-        private readonly EventsPageViewModel _events;
-        private readonly PerformanceViewModel _perf;
         private readonly IDisposable _pointerOverSubscription;
         private ViewModelBase _content;
         private int _selectedTab;
@@ -22,21 +16,31 @@ namespace Avalonia.Diagnostics.ViewModels
         private string _pointerOverElement;
         private bool _shouldVisualizeMarginPadding = true;
 
-        public MainViewModel(IControl root)
+        public MainViewModel(TopLevel root)
         {
-            _root = root;
-            _logicalTree = new TreePageViewModel(this, LogicalTreeNode.Create(root));
-            _visualTree = new TreePageViewModel(this, VisualTreeNode.Create(root));
-            _events = new EventsPageViewModel(root);
-            _perf = new PerformanceViewModel(AvaloniaLocator.Current.GetService<IGraphicsMemoryDiagnostics>());
-
             UpdateFocusedControl();
             KeyboardDevice.Instance.PropertyChanged += KeyboardPropertyChanged;
             SelectedTab = 0;
             _pointerOverSubscription = root.GetObservable(TopLevel.PointerOverElementProperty)
                 .Subscribe(x => PointerOverElement = x?.GetType().Name);
+
+            Root = root;
+            PerformancePage = new PerformancePageViewModel(this);
+            EventsPage = new EventsPageViewModel(Root);
+            LogicalTree = new TreePageViewModel(this, LogicalTreeNode.Create(root));
+            VisualTree = new TreePageViewModel(this, VisualTreeNode.Create(root));
             Console = new ConsoleViewModel(UpdateConsoleContext);
         }
+
+        public TopLevel Root { get; }
+
+        public PerformancePageViewModel PerformancePage { get; }
+
+        public EventsPageViewModel EventsPage { get; }
+
+        public TreePageViewModel LogicalTree { get; }
+
+        public TreePageViewModel VisualTree { get; }
 
         public bool ShouldVisualizeMarginPadding
         {
@@ -89,10 +93,10 @@ namespace Avalonia.Diagnostics.ViewModels
                 _selectedTab = value;
                 Content = value switch
                 {
-                    0 => _logicalTree,
-                    1 => _visualTree,
-                    2 => _events,
-                    3 => _perf,
+                    0 => LogicalTree,
+                    1 => VisualTree,
+                    2 => EventsPage,
+                    3 => PerformancePage,
                     _ => null,
                 };
 
@@ -114,7 +118,7 @@ namespace Avalonia.Diagnostics.ViewModels
 
         private void UpdateConsoleContext(ConsoleContext context)
         {
-            context.root = _root;
+            context.root = Root;
 
             if (Content is TreePageViewModel tree)
             {
@@ -126,18 +130,15 @@ namespace Avalonia.Diagnostics.ViewModels
         {
             var tree = Content as TreePageViewModel;
 
-            if (tree != null)
-            {
-                tree.SelectControl(control);
-            }
+            tree?.SelectControl(control);
         }
 
         public void Dispose()
         {
             KeyboardDevice.Instance.PropertyChanged -= KeyboardPropertyChanged;
             _pointerOverSubscription.Dispose();
-            _logicalTree.Dispose();
-            _visualTree.Dispose();
+            LogicalTree.Dispose();
+            VisualTree.Dispose();
         }
 
         private void UpdateFocusedControl()
